@@ -188,10 +188,18 @@ jobs:
 
     - name: Run benchmarks
       run: |
-        npm run benchmark || echo "No benchmarks configured yet"
+        npm run benchmark || echo '{"benchmarks":[]}' > benchmark-results.json
       continue-on-error: true
 
+    - name: Check benchmark file exists
+      run: |
+        if [ ! -f benchmark-results.json ]; then
+          echo '{"benchmarks":[]}' > benchmark-results.json
+        fi
+        cat benchmark-results.json
+
     - name: Store benchmark result
+      if: success() && hashFiles('benchmark-results.json') != ''
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'customBiggerIsBetter'

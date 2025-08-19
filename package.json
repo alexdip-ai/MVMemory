@@ -15,7 +15,8 @@
     "validate": "npm run build && node scripts/validate.js",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
-    "install:python": "pip install -r requirements.txt"
+    "install:python": "pip install -r requirements.txt",
+    "benchmark": "node scripts/benchmark.js benchmark-results.json"
   },
   "keywords": [
     "mcp",
