@@ -90,7 +90,7 @@ export class TokenOptimizer {
   ): { content: Array<{ type: string; text: string }> } {
     const targetTokens = maxTokens || this.config.maxTokens;
     
-    if (chunks.length === 0) {
+    if (!chunks || chunks.length === 0) {
       return {
         content: [{ type: 'text', text: 'No context available' }]
       };

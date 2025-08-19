@@ -13,7 +13,8 @@ module.exports = {
       tsconfig: {
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
-        module: 'ESNext'
+        module: 'ESNext',
+        target: 'ES2020'
       }
     }]
   },
@@ -25,13 +26,13 @@ module.exports = {
     '!src/**/index.ts'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html', 'json'],
+  coverageReporters: ['text', 'lcov', 'html', 'json', 'text-summary'],
   coverageThreshold: {
     global: {
-      branches: 60,
-      functions: 70,
-      lines: 75,
-      statements: 75
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100
     }
   },
   moduleNameMapper: {
@@ -43,7 +44,7 @@ module.exports = {
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   testTimeout: 30000,
-  verbose: true,
+  verbose: false,
   bail: false,
   maxWorkers: '50%'
 };

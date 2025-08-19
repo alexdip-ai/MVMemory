@@ -19,7 +19,9 @@
       "WebSearch",
       "Bash(mv:*)",
       "Bash(node:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx jest:*)"
     ],
     "deny": [],
     "ask": []

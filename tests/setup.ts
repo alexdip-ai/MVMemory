@@ -7,15 +7,33 @@ process.env.MVMEMORY_LOG_LEVEL = 'error';
 process.env.MVMEMORY_DB = ':memory:';
 process.env.MVMEMORY_CACHE_SIZE = '100';
 
-// Mock console methods to reduce noise in tests
-global.console = {
-  ...console,
-  log: jest.fn(),
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-};
+// Mock winston
+jest.mock('winston', () => {
+  const mockLogger = {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  };
+  
+  return {
+    default: {
+      createLogger: jest.fn(() => mockLogger),
+      format: {
+        combine: jest.fn(() => ({})),
+        timestamp: jest.fn(() => ({})),
+        colorize: jest.fn(() => ({})),
+        printf: jest.fn(() => ({})),
+        json: jest.fn(() => ({})),
+        simple: jest.fn(() => ({}))
+      },
+      transports: {
+        Console: jest.fn(() => ({})),
+        File: jest.fn(() => ({}))
+      }
+    }
+  };
+});
 
 // Increase timeout for CI environments
 if (process.env.CI) {
@@ -25,7 +43,6 @@ if (process.env.CI) {
 // Clean up after each test
 afterEach(() => {
   jest.clearAllMocks();
-  jest.clearAllTimers();
 });
 
 // Global test utilities
@@ -37,7 +54,7 @@ export const mockFileSystem = {
   '/test/file3.js': 'function test() { return "test"; }',
 };
 
-export const createMockChunk = (overrides = {}) => ({
+export const createMockChunk = (overrides: any = {}) => ({
   id: 'test-id',
   type: 'function' as const,
   name: 'testFunction',
