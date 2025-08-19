@@ -1,0 +1,35 @@
+name: Test CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  quick-test:
+    name: Quick CI Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        
+    - name: Test NPM Token
+      run: |
+        if [ -n "${{ secrets.NPM_TOKEN }}" ]; then
+          echo "✅ NPM_TOKEN is configured"
+        else
+          echo "❌ NPM_TOKEN is not configured"
+        fi
+        
+    - name: Quick test
+      run: |
+        echo "CI/CD Pipeline is working!"
+        echo "Timestamp: $(date)"
+        echo "Commit: ${{ github.sha }}"
+        echo "Runner: ${{ runner.os }}"

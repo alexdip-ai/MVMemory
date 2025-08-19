@@ -10,7 +10,9 @@
       "Bash(python -m pytest test_vector_engine.py::TestInitialization::test_basic_initialization -v)",
       "Bash(git init:*)",
       "Bash(git config:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh secret set:*)"
     ],
     "deny": [],
     "ask": []
