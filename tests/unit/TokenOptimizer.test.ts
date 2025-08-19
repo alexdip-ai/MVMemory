@@ -16,7 +16,7 @@ describe('TokenOptimizer', () => {
   });
   
   const createMockResult = (override: Partial<SearchResult> = {}): SearchResult => ({
-    id: 1,
+    id: '1',
     type: 'function',
     name: 'testFunction',
     content: 'function test() { return "hello"; }',
@@ -172,7 +172,7 @@ function test() {
       
       const compressed = (optimizer as any).removeEmptyLines(code);
       
-      expect(compressed.split('\n').filter(line => line.trim() === '')).toHaveLength(0);
+      expect(compressed.split('\n').filter((line: string) => line.trim() === '')).toHaveLength(0);
     });
     
     it('should simplify whitespace while preserving structure', () => {
@@ -340,7 +340,7 @@ function    test(  a,   b  ) {
     it('should handle many search results efficiently', () => {
       const results = Array.from({ length: 1000 }, (_, i) => 
         createMockResult({
-          id: i,
+          id: i.toString(),
           name: `function${i}`,
           content: `function test${i}() { return ${i}; }`,
           relevance: Math.random()
@@ -662,7 +662,7 @@ function importantFunction() {
   describe('Memory and Cache Management', () => {
     it('should handle cache clearing without errors', () => {
       // Build up some internal cache state
-      const results = Array.from({ length: 10 }, (_, i) => createMockResult({ id: i }));
+      const results = Array.from({ length: 10 }, (_, i) => createMockResult({ id: i.toString() }));
       optimizer.optimizeSearchResults(results, 'test');
       
       expect(() => optimizer.clearCache()).not.toThrow();

@@ -20,7 +20,7 @@ export interface ParserConfig {
  */
 export class CodeParser {
   private config: ParserConfig;
-  private logger: winston.Logger;
+  private logger!: winston.Logger;
   
   constructor(config: Partial<ParserConfig> = {}) {
     this.config = {
@@ -293,17 +293,17 @@ export class CodeParser {
           exports.push(content.slice(path.node.start!, path.node.end!));
         },
         
-        FunctionDeclaration(path) {
+        FunctionDeclaration: (path: any) => {
           const chunk = this.extractBabelChunk(path, content, filePath, 'function', imports, exports);
           if (chunk) chunks.push(chunk);
         },
         
-        ClassDeclaration(path) {
+        ClassDeclaration: (path: any) => {
           const chunk = this.extractBabelChunk(path, content, filePath, 'class', imports, exports);
           if (chunk) chunks.push(chunk);
         },
         
-        ArrowFunctionExpression(path) {
+        ArrowFunctionExpression: (path: any) => {
           // Only extract if it's a top-level assignment or export
           if (t.isVariableDeclarator(path.parent) || t.isExportDefaultDeclaration(path.parent)) {
             const chunk = this.extractBabelChunk(path, content, filePath, 'function', imports, exports);

@@ -1,24 +1,12 @@
-import * as sqlite3 from 'sqlite3';
 import { spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import winston from 'winston';
-
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.File({ filename: 'mvmemory.log' }),
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
-});
+import { EventEmitter } from 'events';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 export interface CodeChunk {
   id?: string;
@@ -41,74 +29,98 @@ export interface SearchResult extends CodeChunk {
   relevance: number;
 }
 
-export class VectorStore {
-  private db: sqlite3.Database;
+export interface DatabaseRow {
+  id: string;
+  file_path: string;
+  chunk_type: string;
+  name: string;
+  content: string;
+  start_line: number;
+  end_line: number;
+  language: string;
+  imports: string;
+  exports: string;
+  metadata: string;
+  vector_id?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FileIndexRow {
+  file_path: string;
+  last_indexed: string;
+  file_hash?: string;
+  total_chunks: number;
+}
+
+export interface Database {
+  embeddings: DatabaseRow[];
+  file_index: FileIndexRow[];
+}
+
+export class VectorStore extends EventEmitter {
+  private database: Database = { embeddings: [], file_index: [] };
   private pythonProcess: ChildProcess | null = null;
   private pythonReady: boolean = false;
   private requestQueue: Map<string, (result: any) => void> = new Map();
   private dbPath: string;
+  private logger: winston.Logger;
 
-  constructor(dbPath: string = './mvmemory.db') {
+  constructor(dbPath: string = './mvmemory.json') {
+    super();
     this.dbPath = dbPath;
-    this.db = new sqlite3.Database(dbPath);
+    this.logger = winston.createLogger({
+      level: 'info',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+      ),
+      transports: [
+        new winston.transports.File({ filename: 'mvmemory.log' }),
+        new winston.transports.Console({
+          format: winston.format.simple()
+        })
+      ]
+    });
     this.initDatabase();
     this.startPythonEngine();
   }
 
   private async initDatabase(): Promise<void> {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS embeddings (
-        id TEXT PRIMARY KEY,
-        file_path TEXT NOT NULL,
-        chunk_type TEXT NOT NULL,
-        name TEXT,
-        content TEXT NOT NULL,
-        start_line INTEGER,
-        end_line INTEGER,
-        language TEXT,
-        imports TEXT,
-        exports TEXT,
-        metadata TEXT,
-        vector_id INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    try {
+      const data = await fs.readFile(this.dbPath, 'utf-8');
+      this.database = JSON.parse(data);
+      // Ensure required structure
+      if (!this.database.embeddings) this.database.embeddings = [];
+      if (!this.database.file_index) this.database.file_index = [];
+    } catch (error) {
+      // File doesn't exist or is invalid, create new database
+      this.database = { embeddings: [], file_index: [] };
+      await this.saveDatabase();
+    }
+    this.logger.info('Database initialized successfully');
+  }
 
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_file_path 
-      ON embeddings(file_path)
-    `);
-
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_chunk_type 
-      ON embeddings(chunk_type)
-    `);
-
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_language 
-      ON embeddings(language)
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS file_index (
-        file_path TEXT PRIMARY KEY,
-        last_indexed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        file_hash TEXT,
-        total_chunks INTEGER DEFAULT 0
-      )
-    `);
-
-    logger.info('Database initialized successfully');
+  private async saveDatabase(): Promise<void> {
+    try {
+      await fs.mkdir(path.dirname(this.dbPath), { recursive: true });
+      await fs.writeFile(this.dbPath, JSON.stringify(this.database, null, 2));
+    } catch (error) {
+      this.logger.error('Failed to save database:', error);
+      throw error;
+    }
   }
 
   private async startPythonEngine(): Promise<void> {
-    const pythonScriptPath = path.join(__dirname, '..', 'python', 'vector_engine.py');
+    // Handle ES module __dirname equivalent
+    const currentFileUrl = import.meta.url;
+    const currentDir = dirname(fileURLToPath(currentFileUrl));
+    const pythonScriptPath = path.join(currentDir, '..', 'python', 'vector_engine.py');
     
     try {
       await fs.access(pythonScriptPath);
     } catch (error) {
-      logger.error('Python vector engine script not found:', error);
+      this.logger.error('Python vector engine script not found:', error);
       return;
     }
 
@@ -123,7 +135,7 @@ export class VectorStore {
           const response = JSON.parse(line);
           if (response.type === 'ready') {
             this.pythonReady = true;
-            logger.info('Python vector engine ready');
+            this.logger.info('Python vector engine ready');
           } else if (response.requestId && this.requestQueue.has(response.requestId)) {
             const callback = this.requestQueue.get(response.requestId);
             this.requestQueue.delete(response.requestId);
@@ -131,16 +143,16 @@ export class VectorStore {
           }
         }
       } catch (error) {
-        logger.error('Error parsing Python response:', error);
+        this.logger.error('Error parsing Python response:', error);
       }
     });
 
     this.pythonProcess.stderr?.on('data', (data) => {
-      logger.error('Python engine error:', data.toString());
+      this.logger.error('Python engine error:', data.toString());
     });
 
     this.pythonProcess.on('exit', (code) => {
-      logger.warn(`Python engine exited with code ${code}`);
+      this.logger.warn(`Python engine exited with code ${code}`);
       this.pythonReady = false;
       setTimeout(() => this.startPythonEngine(), 5000);
     });
@@ -179,15 +191,9 @@ export class VectorStore {
 
   async addChunk(chunk: CodeChunk): Promise<void> {
     const id = chunk.id || uuidv4();
+    const now = new Date().toISOString();
     
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO embeddings (
-        id, file_path, chunk_type, name, content,
-        start_line, end_line, language, imports, exports, metadata, vector_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    let vectorId = null;
+    let vectorId: number | undefined = undefined;
     
     if (this.pythonReady) {
       try {
@@ -202,51 +208,59 @@ export class VectorStore {
         });
         vectorId = result.vectorIds?.[0];
       } catch (error) {
-        logger.error('Failed to create embedding:', error);
+        this.logger.error('Failed to create embedding:', error);
       }
     }
 
-    stmt.run(
+    // Remove existing entry with same id if it exists
+    this.database.embeddings = this.database.embeddings.filter(row => row.id !== id);
+    
+    // Add new entry
+    const row: DatabaseRow = {
       id,
-      chunk.filePath,
-      chunk.type,
-      chunk.name,
-      chunk.content,
-      chunk.startLine,
-      chunk.endLine,
-      chunk.language,
-      JSON.stringify(chunk.imports),
-      JSON.stringify(chunk.exports),
-      JSON.stringify(chunk.metadata || {}),
-      vectorId
-    );
-
+      file_path: chunk.filePath,
+      chunk_type: chunk.type,
+      name: chunk.name,
+      content: chunk.content,
+      start_line: chunk.startLine,
+      end_line: chunk.endLine,
+      language: chunk.language,
+      imports: JSON.stringify(chunk.imports),
+      exports: JSON.stringify(chunk.exports),
+      metadata: JSON.stringify(chunk.metadata || {}),
+      vector_id: vectorId,
+      created_at: now,
+      updated_at: now
+    };
+    
+    this.database.embeddings.push(row);
+    await this.saveDatabase();
     this.updateFileIndex(chunk.filePath);
-    logger.debug(`Added chunk: ${chunk.filePath}:${chunk.startLine}-${chunk.endLine}`);
+    this.logger.debug(`Added chunk: ${chunk.filePath}:${chunk.startLine}-${chunk.endLine}`);
   }
 
   async removeFile(filePath: string): Promise<void> {
-    const chunks = this.db.prepare('SELECT id, vector_id FROM embeddings WHERE file_path = ?')
-      .all(filePath) as any[];
+    const chunks = this.database.embeddings.filter(row => row.file_path === filePath);
 
     if (this.pythonReady && chunks.length > 0) {
       const vectorIds = chunks
-        .filter(c => c.vector_id !== null)
-        .map(c => c.vector_id);
+        .filter(c => c.vector_id !== undefined && c.vector_id !== null)
+        .map(c => c.vector_id!);
       
       if (vectorIds.length > 0) {
         try {
           await this.sendToPython('remove', { vectorIds });
         } catch (error) {
-          logger.error('Failed to remove embeddings:', error);
+          this.logger.error('Failed to remove embeddings:', error);
         }
       }
     }
 
-    this.db.prepare('DELETE FROM embeddings WHERE file_path = ?').run(filePath);
-    this.db.prepare('DELETE FROM file_index WHERE file_path = ?').run(filePath);
+    this.database.embeddings = this.database.embeddings.filter(row => row.file_path !== filePath);
+    this.database.file_index = this.database.file_index.filter(row => row.file_path !== filePath);
     
-    logger.info(`Removed file from index: ${filePath}`);
+    await this.saveDatabase();
+    this.logger.info(`Removed file from index: ${filePath}`);
   }
 
   async search(query: string, limit: number = 10, fileTypes?: string[]): Promise<SearchResult[]> {
@@ -262,21 +276,11 @@ export class VectorStore {
         const ids = vectorResults.map((r: any) => r.metadata.id);
         
         if (ids.length > 0) {
-          const placeholders = ids.map(() => '?').join(',');
-          let sqlQuery = `
-            SELECT * FROM embeddings 
-            WHERE id IN (${placeholders})
-          `;
-
-          const params: any[] = [...ids];
+          let rows = this.database.embeddings.filter(row => ids.includes(row.id));
 
           if (fileTypes && fileTypes.length > 0) {
-            const fileTypePlaceholders = fileTypes.map(() => '?').join(',');
-            sqlQuery += ` AND language IN (${fileTypePlaceholders})`;
-            params.push(...fileTypes);
+            rows = rows.filter(row => fileTypes.includes(row.language));
           }
-
-          const rows = this.db.prepare(sqlQuery).all(...params) as any[];
 
           results = rows.map(row => {
             const vectorResult = vectorResults.find((v: any) => v.metadata.id === row.id);
@@ -284,27 +288,21 @@ export class VectorStore {
           });
         }
       } catch (error) {
-        logger.error('Vector search failed, falling back to text search:', error);
+        this.logger.error('Vector search failed, falling back to text search:', error);
       }
     }
 
     if (results.length === 0) {
-      let sqlQuery = `
-        SELECT * FROM embeddings 
-        WHERE content LIKE ? OR name LIKE ?
-      `;
-      const params: any[] = [`%${query}%`, `%${query}%`];
+      let rows = this.database.embeddings.filter(row => 
+        row.content.toLowerCase().includes(query.toLowerCase()) || 
+        row.name.toLowerCase().includes(query.toLowerCase())
+      );
 
       if (fileTypes && fileTypes.length > 0) {
-        const placeholders = fileTypes.map(() => '?').join(',');
-        sqlQuery += ` AND language IN (${placeholders})`;
-        params.push(...fileTypes);
+        rows = rows.filter(row => fileTypes.includes(row.language));
       }
 
-      sqlQuery += ' LIMIT ?';
-      params.push(limit);
-
-      const rows = this.db.prepare(sqlQuery).all(...params) as any[];
+      rows = rows.slice(0, limit);
       results = rows.map(row => this.rowToSearchResult(row, 0, 0.5));
     }
 
@@ -337,10 +335,10 @@ export class VectorStore {
     return context;
   }
 
-  private rowToSearchResult(row: any, distance?: number, relevance?: number): SearchResult {
+  private rowToSearchResult(row: DatabaseRow, distance?: number, relevance?: number): SearchResult {
     return {
       id: row.id,
-      type: row.chunk_type,
+      type: row.chunk_type as 'function' | 'class' | 'module' | 'generic',
       name: row.name,
       content: row.content,
       filePath: row.file_path,
@@ -357,19 +355,35 @@ export class VectorStore {
   }
 
   private updateFileIndex(filePath: string): void {
-    const count = this.db.prepare('SELECT COUNT(*) as count FROM embeddings WHERE file_path = ?')
-      .get(filePath) as any;
-
-    this.db.prepare(`
-      INSERT OR REPLACE INTO file_index (file_path, last_indexed, total_chunks)
-      VALUES (?, CURRENT_TIMESTAMP, ?)
-    `).run(filePath, count.count);
+    const count = this.database.embeddings.filter(row => row.file_path === filePath).length;
+    const now = new Date().toISOString();
+    
+    // Remove existing entry
+    this.database.file_index = this.database.file_index.filter(row => row.file_path !== filePath);
+    
+    // Add updated entry
+    this.database.file_index.push({
+      file_path: filePath,
+      last_indexed: now,
+      total_chunks: count
+    });
   }
 
   async getStats(): Promise<any> {
-    const totalChunks = (this.db.prepare('SELECT COUNT(*) as count FROM embeddings').get() as any).count;
-    const totalFiles = (this.db.prepare('SELECT COUNT(*) as count FROM file_index').get() as any).count;
-    const languages = this.db.prepare('SELECT language, COUNT(*) as count FROM embeddings GROUP BY language').all();
+    const totalChunks = this.database.embeddings.length;
+    const totalFiles = this.database.file_index.length;
+    
+    // Group by language
+    const languageMap = new Map<string, number>();
+    this.database.embeddings.forEach(row => {
+      const count = languageMap.get(row.language) || 0;
+      languageMap.set(row.language, count + 1);
+    });
+    
+    const languages = Array.from(languageMap.entries()).map(([language, count]) => ({
+      language,
+      count
+    }));
 
     return {
       totalChunks,
@@ -383,7 +397,12 @@ export class VectorStore {
     if (this.pythonProcess) {
       this.pythonProcess.kill();
     }
-    this.db.close();
-    logger.info('VectorStore closed');
+    await this.saveDatabase();
+    this.logger.info('VectorStore closed');
+  }
+
+  // Add health check method
+  healthCheck(): boolean {
+    return this.pythonReady;
   }
 }

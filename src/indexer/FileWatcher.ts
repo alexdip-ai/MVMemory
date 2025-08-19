@@ -38,7 +38,7 @@ export class FileWatcher extends EventEmitter {
   private parser: CodeParser;
   private vectorStore: VectorStore;
   private config: FileWatcherConfig;
-  private logger: winston.Logger;
+  private logger!: winston.Logger;
   
   // Debouncing and batching
   private indexQueue: Map<string, NodeJS.Timeout> = new Map();

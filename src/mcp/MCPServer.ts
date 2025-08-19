@@ -1,5 +1,11 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { 
+  ListToolsRequestSchema, 
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema
+} from '@modelcontextprotocol/sdk/types.js';
 import { VectorStore } from '../core/VectorStore.js';
 import { FileWatcher } from '../indexer/FileWatcher.js';
 import { TokenOptimizer } from '../optimization/TokenOptimizer.js';
@@ -25,18 +31,18 @@ export interface MCPServerConfig {
  * Provides semantic search, context retrieval, and code similarity tools
  */
 export class MCPVectorServer {
-  private server: Server;
-  private vectorStore: VectorStore;
+  private server!: Server;
+  private vectorStore!: VectorStore;
   private fileWatcher: FileWatcher | null = null;
-  private tokenOptimizer: TokenOptimizer;
-  private metricsCollector: MetricsCollector;
-  private cacheManager: CacheManager;
-  private logger: winston.Logger;
+  private tokenOptimizer!: TokenOptimizer;
+  private metricsCollector!: MetricsCollector;
+  private cacheManager!: CacheManager;
+  private logger!: winston.Logger;
   private config: MCPServerConfig;
   
   constructor(config: MCPServerConfig = {}) {
     this.config = {
-      dbPath: path.join(os.homedir(), '.mvmemory', 'mvmemory.db'),
+      dbPath: path.join(os.homedir(), '.mvmemory', 'mvmemory.json'),
       cacheDir: path.join(os.homedir(), '.mvmemory', 'cache'),
       maxTokens: 100000,
       autoIndex: true,
@@ -80,11 +86,7 @@ export class MCPVectorServer {
   
   private initializeComponents(): void {
     // Initialize vector store
-    this.vectorStore = new VectorStore({
-      dbPath: this.config.dbPath!,
-      cacheDir: this.config.cacheDir,
-      logLevel: this.config.logLevel
-    });
+    this.vectorStore = new VectorStore(this.config.dbPath!);
     
     // Initialize other components
     this.tokenOptimizer = new TokenOptimizer({
@@ -123,7 +125,7 @@ export class MCPVectorServer {
   
   private setupHandlers(): void {
     // List available tools
-    this.server.setRequestHandler('tools/list', async () => ({
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
           name: 'semantic_search',
@@ -289,7 +291,7 @@ export class MCPVectorServer {
     }));
     
     // Handle tool calls
-    this.server.setRequestHandler('tools/call', async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       
       try {
@@ -397,7 +399,7 @@ export class MCPVectorServer {
     }
     
     // Search for the target
-    const mainResults = await this.vectorStore.search(target, 1, 0.7);
+    const mainResults = await this.vectorStore.search(target, 1);
     if (mainResults.length === 0) {
       return {
         content: [
@@ -545,9 +547,9 @@ export class MCPVectorServer {
     const watcherStatus = this.fileWatcher?.getStatus();
     
     const health = {
-      status: vectorHealth.ready ? 'healthy' : 'unhealthy',
+      status: vectorHealth ? 'healthy' : 'unhealthy',
       components: {
-        vector_store: vectorHealth,
+        vector_store: { ready: vectorHealth },
         file_watcher: watcherStatus || { status: 'not_initialized' },
         cache: {
           status: 'healthy',
@@ -598,21 +600,21 @@ export class MCPVectorServer {
     
     // Search for imports
     for (const imp of chunk.imports || []) {
-      const importResults = await this.vectorStore.search(imp, 2, 0.8);
+      const importResults = await this.vectorStore.search(imp, 2);
       related.push(...importResults);
     }
     
     // Search for function calls in the content
     const functionCalls = this.extractFunctionCalls(chunk.content);
     for (const call of functionCalls.slice(0, depth * 2)) {
-      const callResults = await this.vectorStore.search(call, 1, 0.8);
+      const callResults = await this.vectorStore.search(call, 1);
       related.push(...callResults);
     }
     
     // Include tests if requested
     if (includeTests) {
       const testQuery = `test ${chunk.name}`;
-      const testResults = await this.vectorStore.search(testQuery, 3, 0.7);
+      const testResults = await this.vectorStore.search(testQuery, 3);
       related.push(...testResults.filter((r: any) => 
         r.filePath.includes('test') || 
         r.filePath.includes('spec') ||

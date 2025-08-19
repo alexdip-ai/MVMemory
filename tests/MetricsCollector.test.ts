@@ -319,7 +319,7 @@ describe('MetricsCollector', () => {
       expect(report.period.end).toBeGreaterThan(report.period.start);
     });
 
-    it('should maintain consistent timestamps', () => {
+    it('should maintain consistent timestamps', async () => {
       const report1 = collector.getReport();
       
       // Small delay
@@ -426,7 +426,7 @@ describe('MetricsCollector', () => {
       expect(report.system.errorRate).toBe(0);
     });
 
-    it('should reset timestamps', () => {
+    it('should reset timestamps', async () => {
       const oldReport = collector.getReport();
       const oldStartTime = oldReport.period.start;
       
@@ -497,7 +497,7 @@ describe('MetricsCollector', () => {
 
     it('should handle rapid concurrent operations', () => {
       const operations = 1000;
-      const promises = [];
+      const promises: Promise<void>[] = [];
       
       for (let i = 0; i < operations; i++) {
         promises.push(

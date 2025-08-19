@@ -398,7 +398,7 @@ describe('CacheManager', () => {
     });
 
     it('should handle concurrent operations gracefully', () => {
-      const promises = [];
+      const promises: Promise<void>[] = [];
       
       for (let i = 0; i < 100; i++) {
         promises.push(
