@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm test)",
+      "Bash(npm install)",
+      "Bash(npx tsc:*)",
+      "Bash(python -m pytest test_vector_engine.py::TestInitialization::test_basic_initialization -v)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

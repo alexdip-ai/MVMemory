@@ -1,0 +1,144 @@
+# Docker Compose configuration for MVMemory
+version: '3.8'
+
+services:
+  mvmemory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mvmemory
+    restart: unless-stopped
+    
+    # Resource limits
+    mem_limit: 4g
+    mem_reservation: 2g
+    cpus: '2.0'
+    
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - MVMEMORY_DB=/data/db/mvmemory.db
+      - MVMEMORY_CACHE_DIR=/data/cache
+      - MVMEMORY_LOG_LEVEL=${MVMEMORY_LOG_LEVEL:-info}
+      - MVMEMORY_AUTO_INDEX=${MVMEMORY_AUTO_INDEX:-true}
+      - MVMEMORY_WATCH_FILES=${MVMEMORY_WATCH_FILES:-true}
+      - MVMEMORY_CACHE_SIZE=${MVMEMORY_CACHE_SIZE:-2000}
+      - MVMEMORY_MAX_TOKENS=${MVMEMORY_MAX_TOKENS:-100000}
+      - MVMEMORY_MAX_FILE_SIZE=${MVMEMORY_MAX_FILE_SIZE:-10MB}
+      - MVMEMORY_BATCH_SIZE=${MVMEMORY_BATCH_SIZE:-10}
+      - MVMEMORY_WORKERS=${MVMEMORY_WORKERS:-4}
+    
+    # Volumes
+    volumes:
+      # Persistent data
+      - mvmemory-db:/data/db
+      - mvmemory-cache:/data/cache
+      - mvmemory-logs:/data/logs
+      - mvmemory-models:/opt/models
+      
+      # Mount your code projects here
+      - ${PROJECTS_PATH:-./projects}:/projects:ro
+      
+      # Optional: Mount specific project
+      # - /path/to/your/project:/workspace:ro
+    
+    # Ports (if HTTP interface is added in future)
+    ports:
+      - "${MVMEMORY_PORT:-7777}:7777"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sentence_transformers; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Development service with live reload
+  mvmemory-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    container_name: mvmemory-dev
+    restart: "no"
+    profiles: ["dev"]
+    
+    environment:
+      - NODE_ENV=development
+      - MVMEMORY_DB=/data/db/mvmemory.db
+      - MVMEMORY_CACHE_DIR=/data/cache
+      - MVMEMORY_LOG_LEVEL=debug
+      - MVMEMORY_AUTO_INDEX=true
+      - MVMEMORY_WATCH_FILES=true
+    
+    volumes:
+      - .:/app
+      - mvmemory-dev-db:/data/db
+      - mvmemory-dev-cache:/data/cache
+      - mvmemory-dev-logs:/data/logs
+      - mvmemory-models:/opt/models
+      - ${PROJECTS_PATH:-./projects}:/projects:ro
+    
+    command: ["npm", "run", "dev"]
+    
+    ports:
+      - "7778:7777"
+    
+    # Override memory limits for development
+    mem_limit: 2g
+
+# Named volumes for data persistence
+volumes:
+  # Production volumes
+  mvmemory-db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/db
+  
+  mvmemory-cache:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/cache
+  
+  mvmemory-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/logs
+  
+  mvmemory-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/models
+  
+  # Development volumes
+  mvmemory-dev-db:
+    driver: local
+  
+  mvmemory-dev-cache:
+    driver: local
+  
+  mvmemory-dev-logs:
+    driver: local
+
+# Networks
+networks:
+  default:
+    name: mvmemory-network
+    driver: bridge

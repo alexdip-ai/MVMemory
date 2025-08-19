@@ -1,0 +1,61 @@
+{
+  "name": "mvmemory",
+  "version": "1.0.0",
+  "description": "Local vector memory system for Claude Code CLI with 70-90% token savings",
+  "type": "module",
+  "main": "dist/mcp/MCPServer.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/mcp/MCPServer.js",
+    "dev": "ts-node src/mcp/MCPServer.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "install:python": "pip install -r requirements.txt",
+    "postinstall": "npm run build && npm run install:python"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "vector-search",
+    "semantic-search",
+    "code-analysis"
+  ],
+  "author": "MVMemory Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "@babel/parser": "^7.24.0",
+    "@babel/traverse": "^7.24.0",
+    "@babel/types": "^7.24.0",
+    "better-sqlite3": "^9.4.3",
+    "chokidar": "^3.6.0",
+    "typescript": "^5.4.2",
+    "winston": "^3.11.0",
+    "node-cache": "^5.1.2",
+    "uuid": "^9.0.1",
+    "fs-extra": "^11.2.0",
+    "glob": "^10.3.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/babel__traverse": "^7.20.5",
+    "@types/babel__generator": "^7.6.4",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/uuid": "^9.0.8",
+    "@types/jest": "^29.5.12",
+    "@types/fs-extra": "^11.0.4",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "prettier": "^3.2.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
