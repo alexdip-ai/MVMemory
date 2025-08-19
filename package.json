@@ -13,8 +13,7 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
-    "install:python": "pip install -r requirements.txt",
-    "postinstall": "npm run build && npm run install:python"
+    "install:python": "pip install -r requirements.txt"
   },
   "keywords": [
     "mcp",
@@ -30,7 +29,7 @@
     "@babel/parser": "^7.24.0",
     "@babel/traverse": "^7.24.0",
     "@babel/types": "^7.24.0",
-    "better-sqlite3": "^9.4.3",
+    "sqlite3": "^5.1.6",
     "chokidar": "^3.6.0",
     "typescript": "^5.4.2",
     "winston": "^3.11.0",

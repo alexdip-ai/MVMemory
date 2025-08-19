@@ -12,7 +12,10 @@
       "Bash(git config:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(gh secret set:*)"
+      "Bash(gh secret set:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

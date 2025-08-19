@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import * as sqlite3 from 'sqlite3';
 import { spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
@@ -42,7 +42,7 @@ export interface SearchResult extends CodeChunk {
 }
 
 export class VectorStore {
-  private db: Database.Database;
+  private db: sqlite3.Database;
   private pythonProcess: ChildProcess | null = null;
   private pythonReady: boolean = false;
   private requestQueue: Map<string, (result: any) => void> = new Map();
@@ -50,7 +50,7 @@ export class VectorStore {
 
   constructor(dbPath: string = './mvmemory.db') {
     this.dbPath = dbPath;
-    this.db = new Database(dbPath);
+    this.db = new sqlite3.Database(dbPath);
     this.initDatabase();
     this.startPythonEngine();
   }
