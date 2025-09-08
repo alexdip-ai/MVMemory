@@ -41,7 +41,7 @@
     "glob": "^10.3.10"
   },
   "devDependencies": {
-    "@types/node": "^20.11.24",
+    "@types/node": "^20.19.13",
     "@types/babel__traverse": "^7.20.5",
     "@types/babel__generator": "^7.6.4",
     "@types/uuid": "^9.0.8",
